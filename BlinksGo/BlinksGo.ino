@@ -1,8 +1,17 @@
-// BlinksGo1_1
+// BlinksGo
 // by Brett Taylor
 // Created 2/3/2020
 
 /*
+---- RULES ----
+2P, each start with 6 Blinks of their color. Start the game with two opposing Blinks connected (to skip the inevitable first two moves).
+Players take turns connecting one of their Blinks to the group.
+If a player's Blink is touching 3 opponent Blinks, that Blink gets captured by the opponent! It will flash green. Remove the Blink from the cluster, click to confirm the capture, and put in opponent's hand.
+You win by having the most Blinks on the board at the end!
+Capturing Note #1: As in Go, you can't make a move that would revert the board to its immediate previous state-- i.e. you can't capture the same piece back and forth forever.
+Capturing Note #2: You can't capture a piece if removing it would split the group in two. You can still make the move, however. (NOTE: Can play with this rule, see what feels balanced)
+----------------
+
 TODOS
 Long-press to convert all adjacent tiles to my color.
 Instead of red flashing, have it spiral opponent color happily! "Pick me up! I'm yours now!" wasCaptured = true. Click to set wasCaptured to false, and change its team.

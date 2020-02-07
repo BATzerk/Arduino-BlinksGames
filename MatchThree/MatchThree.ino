@@ -1,23 +1,43 @@
+// MatchThree (working title)
+// by Brett Taylor
+// Started 2/7/2020
 
 /*
+---- RULES ----
+1P. 8+ Blinks.
+SETUP: Cluster all Blinks together.
+PLAY: Make a move to match as many like-colors as possible! Fracture-like splitting rules.
+      Pull a chunk (or even 1) of Blinks off, rotate as desired, and stick it back on to the main cluster.
+      Three or more Blinks touching will match, clear, and change color!
+WINNING: Currently no endgame right now. Perhaps could add a scoring and moves count system though.
+
+
+
+TODOS (DONE)
+Add state PREIDLE. Fade in my color for 0.5 seconds.
+Make happy flash spiral white around my color!
+Each Blink checks if it's touching 2+ of its team. If YES, then say isMatchHappy. Broadcast it.
+If isMatchHappy, flicker rainbow for 1 second, then randomize my team.
+If my NEIGHbor is isMatchHappy and we MATCH, then also set ME isMatchHappy!
+
+MAYBES
 New ones that come in shouldn't match
 4+ in a row must be rewarded, man
 
 
- */
+*/
 
 
 
 // Constants
-enum GameState {UNDEFINED, PREPPING, PLAYING, RESULTS};
-byte teamHues[] = {15, 42, 110, 230 };
-int NUM_TEAMS = 4;
+enum MatchState {UNDEFINED, PREIDLE, IDLE, MATCHED};
+int teamHues[] = {15,42,110,230,75};
+int NUM_TEAMS = 5;
 
 // Properties
 byte myTeam;
-byte myGameState;
-byte myTeamHue;
-Color myTeamColor = makeColorRGB(0,255,255);
+byte myMatchState;
+Color myTeamColor;
 unsigned long timeWhenNextState;
 
 
@@ -25,92 +45,126 @@ unsigned long timeWhenNextState;
 // ==== SETUP ====
 void setup() {
   randomize(); // must call to randomize seed across Blinks.
-  resetTeam();
+  setStatePreIdle();
 }
 
 
 
 // ==== LOOP ====
 void loop() {
-  // Update LOGIC
+  // LOGIC
   if (millis() > timeWhenNextState) {
     goToNextState();
   }
-
-  switch (myGameState) {
-    case PLAYING:
-      updateNeighborInfo();
+  switch (myMatchState) {
+    case IDLE:
+      updateIdle();
       break;
   }
-  
+  // DEBUG
   if (buttonLongPressed()) {
-    startPrepping();
+    setStatePreIdle();
   }
-  
-  
 
-  // Update DISPLAY
-  switch (myGameState) {
+  // DISPLAY
+  switch (myMatchState) {
     case UNDEFINED: setColor(MAGENTA); break;
-    case PREPPING: displayPrepping(); break;
-    case PLAYING: displayPlaying(); break;
-    case RESULTS: displayResults(); break;
-  }
-
-}
-
-
-
-void goToNextState() {
-  myGameState = getNextGameState();
-  switch (myGameState) {
-    case PREPPING: startPrepping(); break;
-    case PLAYING: startPlaying(); break;
-    case RESULTS: startResults(); break;
-  }
-}
-byte getNextGameState() {
-  switch (myGameState) {
-    case PREPPING: return PLAYING;
-    case PLAYING: return RESULTS;
-    case RESULTS: return PREPPING;
+    case PREIDLE: displayPreIdle(); break;
+    case IDLE: displayIdle(); break;
+    case MATCHED: displayMatched(); break;
   }
 }
 
+void updateIdle() {
+  int numNeighborsMyColor = 0;
+  FOREACH_FACE(f) {
+    if (!isValueReceivedOnFaceExpired(f)) {
+      byte data = getLastValueReceivedOnFace(f);
+      byte neighborTeam = getTeamFromData(data);
+      byte neighborMatchState = getMatchStateFromData(data);
+      if (neighborTeam == myTeam && neighborMatchState != PREIDLE) {
+        numNeighborsMyColor ++;
+        // Should I JOIN this match??
+        if (neighborMatchState == MATCHED) {
+          setStateMatched();
+        }
+      }
+    }
+  }
+  // Check if I should CREATE a match!
+  if (numNeighborsMyColor >= 2) {
+    setStateMatched();
+  }
+}
 
-void setGameState(byte _state) {
-  myGameState = _state;
-  updateValuesSentOnFaces();
+
+// ==== DISPLAY ====
+void displayIdle() {
+  setColor(myTeamColor);
 }
-void updateValuesSentOnFaces() {
-  byte sendData = (myGameState << 2) + (myTeam);
-  setValueSentOnAllFaces(sendData); // also tell all my neighbors! if any are aboout to be this state, tell 'em to just switch now.
+void displayPreIdle() {
+  float timeLeft = timeWhenNextState - millis();
+  float locToNextState = (500-timeLeft) / 500.0;
+  Color color = dim(myTeamColor, locToNextState*255);
+  setColor(color);
 }
-byte gameStateFromData(byte data) {
-  return data >> 2 & 3;
-}
-byte teamFromData(byte data) {
-  return data & 3;
+void displayMatched() {
+  setColor(myTeamColor);
+  // Spiral happy white!
+  int face0 = (millis()/50) % FACE_COUNT;
+  int face1 = (face0+1) % FACE_COUNT;
+  int face2 = (face1+1) % FACE_COUNT;
+  setColorOnFace(makeColorHSB(teamHues[myTeam],  0,255), face0);
+  setColorOnFace(makeColorHSB(teamHues[myTeam],120,255), face1);
+  setColorOnFace(makeColorHSB(teamHues[myTeam],220,255), face2);
 }
 
-void startPrepping() {
-  setGameState(PREPPING);
-  timeWhenNextState = millis() + 3000;
-}
-void startPlaying() {
-  setGameState(PLAYING);
-  myTeam = random(NUM_TEAMS-1);
-  myTeamHue = teamHues[myTeam];
-  myTeamColor = makeColorHSB(myTeamHue, 255,255);
-  timeWhenNextState = millis() + getRoundDuration();
+
+
+// ==== DOERS ====
+void setMyTeam(byte _team) {
+  myTeam = _team;
+  myTeamColor = makeColorHSB(teamHues[myTeam],255,255);
+  setColor(myTeamColor);
   updateValuesSentOnFaces(); // now we know what team I'm on, set my face values!
 }
-void startResults() {
-  setGameState(RESULTS);
-  timeWhenNextState = millis() + 5000;
-  // Increment score
-  numRoundsPlayed ++;
-  if (!isHappy) {
-    numTimesWrong ++;
+void setMyMatchState(MatchState _state) {
+  myMatchState = _state;
+  updateValuesSentOnFaces();
+}
+
+void setStatePreIdle() {
+  setMyTeam(random(NUM_TEAMS-1));
+  setMyMatchState(PREIDLE);
+  timeWhenNextState = millis() + 500;
+}
+void setStateIdle() {
+  setMyMatchState(IDLE);
+  timeWhenNextState = 99999999;
+}
+void setStateMatched() {
+  setMyMatchState(MATCHED);
+  timeWhenNextState = millis() + 500;
+}
+
+void goToNextState() {
+  switch (myMatchState) {
+    case PREIDLE: setStateIdle(); break;
+    case MATCHED: setStatePreIdle(); break;
   }
+}
+
+
+
+
+// ==== DATA ====
+void updateValuesSentOnFaces() {
+  byte sendData = (myMatchState << 3) + (myTeam);
+  setValueSentOnAllFaces(sendData); // also tell all my neighbors! if any are aboout to be this state, tell 'em to just switch now.
+}
+byte getMatchStateFromData(byte data) {
+  return data >> 3 & 0b11;
+}
+byte getTeamFromData(byte data) {
+  return data & 0b111;
 }

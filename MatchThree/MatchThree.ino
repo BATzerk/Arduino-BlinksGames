@@ -4,12 +4,13 @@
 
 /*
 ---- RULES ----
-1P. 8+ Blinks.
+1P. 12+ Blinks.
 SETUP: Cluster all Blinks together.
 PLAY: Make a move to match as many like-colors as possible! Fracture-like splitting rules.
       Pull a chunk (or even 1) of Blinks off, rotate as desired, and stick it back on to the main cluster.
       Three or more Blinks touching will match, clear, and change color!
 WINNING: Currently no endgame right now. Perhaps could add a scoring and moves count system though.
+NOTE: If playing with 10 or 11 Blinks, you should set it NUM_TEAMS to 4 instead of 5.
 
 
 
@@ -61,10 +62,6 @@ void loop() {
       updateIdle();
       break;
   }
-  // DEBUG
-  if (buttonLongPressed()) {
-    setStatePreIdle();
-  }
 
   // DISPLAY
   switch (myMatchState) {
@@ -73,6 +70,11 @@ void loop() {
     case IDLE: displayIdle(); break;
     case MATCHED: displayMatched(); break;
   }
+  
+//  // DEBUG
+//  if (buttonLongPressed()) {
+//    setStatePreIdle();
+//  }
 }
 
 void updateIdle() {

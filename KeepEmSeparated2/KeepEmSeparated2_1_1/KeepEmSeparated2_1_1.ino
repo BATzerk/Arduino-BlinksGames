@@ -1,14 +1,30 @@
-// Group Therapy
+// KeepEmSeparated2
 // by Brett Taylor
 // Created on February 1 2020, for Global Game Jam 2020!
 
 /*
+---- RULES ----
+1+ Players. 6+ Blinks. 5-10 Min.
+"Put like-colors together!"
+SETUP: Cluster Blinks in one large group. Double click any Blink to start (or reset) the game.
+GAMEPLAY: Each round (~12 seconds) starts when the Blinks turn yellow— when they do, slide them together into a big cluster and get ready!
+          In a moment, they’ll reveal their colors, and when they do, you only have a few seconds to separate them into their color groups!
+          Blinks that are touching a different color will turn red. Ouch! Let’s end each round with all Blinks green and happy, ok? Keep colors separated. Ok? Promise?
+WIN: There’s no end game. Play until you feel your worries have melted away. <3
+----------------
+
+
 TODOS
+Test the below changes!
+If never saw neighbor of same color, get happy if no neighbors! If saw neighbor, get unhappy.
+First two rounds, only pick first two colors.
+
+EVENTUALLY
 Win/lose state!
 Prevent only 1 of a color.
 Do tree of life while prepping
-EVENTUALLY
-Flash red color
+
+IDEAS
 Neighbors on specific faces
 
  */
@@ -16,13 +32,14 @@ Neighbors on specific faces
 
 // Constants
 enum GameState {GAMESTATE_UNDEFINED, PREPPING, PLAYING, RESULTS, RESETGO, RESETRESOLVE};
-enum HappinessTypes {HAPPINESS_UNDEFINED, UNHAPPY, NEUTRAL, HAPPY}; // unhappy if a bad match. neutral if no neighbors. happy if neighbors, and all match me!
+enum HappinessTypes {HAPPINESS_UNDEFINED, UNHAPPY, HAPPY}; // unhappy if a bad match. happy if neighbors, and all match me!
 byte teamHues[] = {25, 100, 230 };
 int NUM_TEAMS = 3;
 
 // Properties
 byte myHappiness;
 byte myTeam;
+bool didSeeMatchingNeighbor; // we use this to resolve single Blink scenarios. If we HAVE seen a matching neighbor and we're alone, we're NOT happy.
 int numNeighborsSame;
 int numNeighborsDifferent;
 byte myGameState;
@@ -51,6 +68,12 @@ unsigned long getRoundDuration() {
   if (numRoundsPlayed == 2) { return 5000; }
   if (numRoundsPlayed <= 8) { return 4500; }
   else { return 4000; }
+}
+byte getRandomTeam() {
+  if (numRoundsPlayed <= 2) { // first 2 rounds, only have 2 colors. Keep it easy, yo.
+    return random(NUM_TEAMS-2);
+  }
+  return random(NUM_TEAMS-1);
 }
 
 
@@ -87,7 +110,7 @@ void loop() {
 // ==== UPDATES ====
 void updateLoopGameplay() {
   // Double-click to start in reset-mode.
-  if (buttonDoubleClicked()) {
+  if (buttonLongPressed()) {
     startResetGo();
   }
   // Time to go to next state?
@@ -123,17 +146,22 @@ void updateHappiness() {
   numNeighborsDifferent = 0;
   FOREACH_FACE(f) {
     if (!isValueReceivedOnFaceExpired(f)) { // if neighbor...
-      bool isMatch = teamFromData(getLastValueReceivedOnFace(f)) == myTeam;
-      if (isMatch) numNeighborsSame ++;
-      else numNeighborsDifferent ++;
+      byte neighborTeam = teamFromData(getLastValueReceivedOnFace(f));
+      if (neighborTeam == myTeam) {
+        numNeighborsSame ++;
+        didSeeMatchingNeighbor = true;
+      }
+      else {
+        numNeighborsDifferent ++;
+      }
     }
   }
   // Any different neighbors? Unhappy.
   if (numNeighborsDifferent > 0) { myHappiness = UNHAPPY; }
   // I've got at least one same neighbor? Happy!
   else if (numNeighborsSame > 0) { myHappiness = HAPPY; }
-  // I've no neighbors. Neutral.
-  else { myHappiness = NEUTRAL; }
+  // I've no neighbors. I'm happy if I HAVEN'T seen a matching neighbor.
+  else { myHappiness = didSeeMatchingNeighbor ? UNHAPPY : HAPPY; }
 }
 
 void updateLoopResetGo() {
@@ -214,10 +242,11 @@ void setGameState(byte _state) {
 void startPrepping() {
   setGameState(PREPPING);
   timeWhenNextState = millis() + 3000;
+  didSeeMatchingNeighbor = false;
 }
 void startPlaying() {
   setGameState(PLAYING);
-  myTeam = random(NUM_TEAMS-1);
+  myTeam = getRandomTeam();
   myTeamHue = teamHues[myTeam];
   myTeamColor = makeColorHSB(myTeamHue, 255,255);
   timeWhenNextState = millis() + getRoundDuration();
@@ -270,9 +299,9 @@ void displayResults() {
   else if (myHappiness == UNHAPPY) {
     setColor(RED);
   }
-  else { // If neutral, leave my color displayed (though a little dimmed).
-    setColor(dim(myTeamColor, 150));
-  }
+//  else { // If neutral, leave my color displayed (though a little dimmed).
+//    setColor(dim(myTeamColor, 150));
+//  }
 }
 
 void displayResetGo() {

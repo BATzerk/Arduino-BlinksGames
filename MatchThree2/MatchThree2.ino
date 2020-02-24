@@ -32,8 +32,8 @@
 
 // Constants
 enum MatchState {UNDEFINED, PREIDLE, IDLE, MATCHED, BOMB, DETONATING, EXPLODING}; // Only Bombs go into DETONATING.
-int teamHues[] = {15, 42, 110, 230, 75};
-int NUM_TEAMS = 5;
+int teamHues[] = {15, 42, 110, 230, 75, 160};
+//int NUM_TEAMS = 4;
 
 // Properties
 // TODO: Add willBecomeBomb flag instead! Check in goToNextState if should become bomb after matching.
@@ -41,6 +41,8 @@ byte myTeam;
 byte myMatchState;
 Color myTeamColor;
 unsigned long timeWhenNextState;
+int numTimesInitiatedAMatch = 0;
+int myUpgradeLevel = 0; // use to tell what color we should be.
 
 
 
@@ -110,24 +112,36 @@ void updateIdleOrMatched() {
   }
   // Check if I should create a MATCH!
   if (mayJoinMatch && numNeighborsMyColor >= 2) {
+    numTimesInitiatedAMatch ++;
     setStateMatched();
   }
-  // Check if I should create a BOMB!
-  if (numNeighborsMyColor >= 3) {
-    setStateBomb();
-  }
+  // NOTE: Disabled bombs!
+//  // Check if I should create a BOMB!
+//  if (numNeighborsMyColor >= 3) {
+//    setStateBomb();
+//  }
 }
 
 
 // ==== DISPLAY ====
 void displayIdle() {
-  setColor(myTeamColor);
+  setColor(OFF);
+  int numPips = numTimesInitiatedAMatch+1;
+  for (int f=0; f<numPips; f++) {
+    setColorOnFace(myTeamColor, f);
+  }
 }
 void displayPreIdle() {
   float timeLeft = timeWhenNextState - millis();
   float locToNextState = (500 - timeLeft) / 500.0;
   Color color = dim(myTeamColor, locToNextState * 255);
-  setColor(color);
+  
+  setColor(OFF);
+  int numPips = numTimesInitiatedAMatch+1;
+  for (int f=0; f<numPips; f++) {
+    setColorOnFace(color, f);
+  }
+//  setColor(color);
 }
 void displayMatched() {
   setColor(myTeamColor);
@@ -165,7 +179,14 @@ void setMyMatchState(MatchState _state) {
 }
 
 void setStatePreIdle() {
-  setMyTeam(random(NUM_TEAMS - 1));
+  // Set myTeam!
+  int newTeam;
+  if (myUpgradeLevel == 0) newTeam = random(3);//random(NUM_TEAMS - 1);
+  else if (myUpgradeLevel == 1) newTeam = random(4);
+  else if (myUpgradeLevel == 2) newTeam = random(5);
+  else newTeam = 6;
+  setMyTeam(newTeam);
+  
   setMyMatchState(PREIDLE);
   timeWhenNextState = millis() + 500;
 }
@@ -176,6 +197,10 @@ void setStateIdle() {
 void setStateMatched() {
   setMyMatchState(MATCHED);
   timeWhenNextState = millis() + 500;
+  if (numTimesInitiatedAMatch >= 6) {
+    myUpgradeLevel ++;
+    numTimesInitiatedAMatch = 0;
+  }
 }
 void setStateBomb() {
   setMyMatchState(BOMB);
